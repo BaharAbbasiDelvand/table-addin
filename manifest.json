@@ -1,0 +1,30 @@
+{
+    "manifest_version": 3,
+    "name": "Table Reader",
+    "version": "1.0",
+    "description": "Extracts table content from the current webpage and lets you download as CSV.",
+    "permissions": [
+        "activeTab",
+        "scripting",
+        "storage"
+    ],
+    "host_permissions": [
+        "<all_urls>"
+    ],
+    "action": {
+        "default_title": "Read tables",
+        "default_popup": "popup.html"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "content_script.js"
+            ],
+            "run_at": "document_idle",
+            "all_frames": true
+        }
+    ]
+}
