@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
-    "name": "Table Reader",
-    "version": "1.0",
-    "description": "Extracts table content from the current webpage and lets you download as CSV.",
+    "name": "Table Grabber",
+    "version": "2.0",
+    "description": "Pick tables from a webpage and extract them to JSON.",
     "permissions": [
         "activeTab",
         "scripting",
@@ -11,10 +11,6 @@
     "host_permissions": [
         "<all_urls>"
     ],
-    "action": {
-        "default_title": "Read tables",
-        "default_popup": "popup.html"
-    },
     "content_scripts": [
         {
             "matches": [
@@ -23,8 +19,10 @@
             "js": [
                 "content_script.js"
             ],
-            "run_at": "document_idle",
-            "all_frames": true
+            "css": [
+                "content_style.css"
+            ],
+            "run_at": "document_idle"
         }
     ]
 }
