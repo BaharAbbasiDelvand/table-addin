@@ -1,28 +1,24 @@
 {
     "manifest_version": 3,
-    "name": "Table Grabber",
-    "version": "2.0",
-    "description": "Pick tables from a webpage and extract them to JSON.",
-    "permissions": [
-        "activeTab",
-        "scripting",
-        "storage"
-    ],
+    "name": "Table Bridge (2-button)",
+    "version": "1.0.0",
+    "description": "Pick tables to Next.js and inject data back into any page.",
+    "permissions": ["activeTab", "scripting", "storage"],
     "host_permissions": [
-        "<all_urls>"
+      "http://localhost:3000/*",
+      "http://127.0.0.1:3000/*",
+      "http://[::1]:3000/*"
     ],
+    "background": { "service_worker": "background.js" },
     "content_scripts": [
-        {
-            "matches": [
-                "<all_urls>"
-            ],
-            "js": [
-                "content_script.js"
-            ],
-            "css": [
-                "content_style.css"
-            ],
-            "run_at": "document_idle"
-        }
-    ]
-}
+      {
+        "matches": ["http://*/*", "https://*/*"],
+        "js": ["content_script.js"],
+        "css": ["content_style.css"],
+        "run_at": "document_idle",
+        "all_frames": true
+      }
+    ],
+    "action": { "default_title": "Table Bridge" }
+  }
+  
