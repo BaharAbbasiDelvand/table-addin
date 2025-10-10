@@ -1,20 +1,27 @@
 <!doctype html>
 <html>
-
-<head>
+  <head>
     <meta charset="utf-8" />
-    <title>Table Reader</title>
-    <link rel="stylesheet" href="popup.css" />
-</head>
-
-<body>
-    <div id="app">
-        <h3>Tables on page</h3>
-        <div id="status">Click "Extract" to read tables from the current page.</div>
-        <button id="extractBtn">Extract tables</button>
-        <div id="tablesContainer"></div>
+    <title>Table Bridge</title>
+    <style>
+      body { font: 13px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 12px; min-width: 280px; }
+      label { display:block; margin-bottom:6px; color:#111827; }
+      input[type="email"] { width:100%; box-sizing:border-box; padding:8px; border-radius:6px; border:1px solid #cbd5e1; }
+      .row { margin-top:10px; display:flex; gap:8px; }
+      button { flex:1; padding:8px 10px; border-radius:6px; border:0; cursor:pointer; }
+      #save { background:#2563eb; color:#fff; }
+      #clear { background:#e5e7eb; color:#111827; }
+      #status { margin-top:10px; color:#374151; min-height:18px; }
+    </style>
+  </head>
+  <body>
+    <label for="email">Email to associate captures</label>
+    <input id="email" type="email" placeholder="you@example.com" />
+    <div class="row">
+      <button id="clear" type="button">Clear</button>
+      <button id="save" type="button">Save</button>
     </div>
+    <div id="status"></div>
     <script src="popup.js"></script>
-</body>
-
+  </body>
 </html>

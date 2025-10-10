@@ -1,24 +1,26 @@
 {
-    "manifest_version": 3,
-    "name": "Table Bridge (2-button)",
-    "version": "1.0.0",
-    "description": "Pick tables to Next.js and inject data back into any page.",
-    "permissions": ["activeTab", "scripting", "storage"],
-    "host_permissions": [
-      "http://localhost:3000/*",
-      "http://127.0.0.1:3000/*",
-      "http://[::1]:3000/*"
-    ],
-    "background": { "service_worker": "background.js" },
-    "content_scripts": [
-      {
-        "matches": ["http://*/*", "https://*/*"],
-        "js": ["content_script.js"],
-        "css": ["content_style.css"],
-        "run_at": "document_idle",
-        "all_frames": true
-      }
-    ],
-    "action": { "default_title": "Table Bridge" }
+  "manifest_version": 3,
+  "name": "Table Bridge (2-button)",
+  "version": "1.0.0",
+  "description": "Pick tables to Next.js and inject data back into any page.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "http://127.0.0.1:3000/*",
+    "http://[::1]:3000/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content_script.js"],
+      "css": ["content_style.css"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "action": {
+    "default_title": "Table Bridge",
+    "default_popup": "popup.html"
   }
-  
+}

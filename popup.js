@@ -1,124 +1,61 @@
-document.getElementById("extractBtn").addEventListener("click", async () => {
-    const status = document.getElementById("status");
-    status.textContent = "Requesting table data...";
+const emailInput = document.getElementById("email");
+const saveBtn = document.getElementById("save");
+const clearBtn = document.getElementById("clear");
+const statusEl = document.getElementById("status");
 
-    const [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true,
-    });
-    if (!tab) {
-        status.textContent = "No active tab found.";
-        return;
-    }
+function setStatus(t) {
+    statusEl.textContent = t || "";
+}
 
-    chrome.tabs.sendMessage(tab.id, { action: "getTables" }, (response) => {
-        if (!response) {
-            status.textContent =
-                "No response — maybe the page blocked scripts or requires reload.";
-            return;
-        }
-        if (!response.ok) {
-            status.textContent = "Failed to extract tables.";
-            return;
-        }
-        const tables = response.tables;
-        status.textContent = `Found ${tables.length} table(s).`;
+function valid(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
+}
 
-        const container = document.getElementById("tablesContainer");
-        container.innerHTML = "";
-
-        tables.forEach((t, idx) => {
-            const panel = document.createElement("div");
-            panel.style.border = "1px solid #ddd";
-            panel.style.padding = "6px";
-            panel.style.margin = "6px 0";
-
-            const title = document.createElement("div");
-            title.textContent = `Table ${idx + 1} — ${
-                t.headers.length ? t.headers.length + " cols" : ""
-            } ${t.rows.length} rows`;
-            panel.appendChild(title);
-
-            const tablePreview = document.createElement("table");
-            tablePreview.style.width = "100%";
-            tablePreview.style.borderCollapse = "collapse";
-            tablePreview.style.marginTop = "6px";
-
-            // build header row if available
-            if (t.headers && t.headers.length) {
-                const hr = document.createElement("tr");
-                t.headers.forEach((h) => {
-                    const th = document.createElement("th");
-                    th.textContent = h;
-                    th.style.border = "1px solid #ccc";
-                    th.style.padding = "4px";
-                    hr.appendChild(th);
-                });
-                tablePreview.appendChild(hr);
-            }
-
-            // preview up to 8 rows
-            t.rows.slice(0, 8).forEach((r) => {
-                const tr = document.createElement("tr");
-                r.forEach((c) => {
-                    const td = document.createElement("td");
-                    td.textContent = c;
-                    td.style.border = "1px solid #eee";
-                    td.style.padding = "4px";
-                    tr.appendChild(td);
-                });
-                tablePreview.appendChild(tr);
-            });
-
-            panel.appendChild(tablePreview);
-
-            const downloadBtn = document.createElement("button");
-            downloadBtn.textContent = "Download CSV";
-            downloadBtn.style.marginTop = "6px";
-            downloadBtn.addEventListener("click", () => {
-                const csv = toCSV(t);
-                downloadBlob(csv, `table-${idx + 1}.csv`);
-            });
-            panel.appendChild(downloadBtn);
-
-            const copyBtn = document.createElement("button");
-            copyBtn.textContent = "Copy CSV";
-            copyBtn.style.marginLeft = "6px";
-            copyBtn.addEventListener("click", async () => {
-                const csv = toCSV(t);
-                try {
-                    await navigator.clipboard.writeText(csv);
-                    status.textContent = "CSV copied to clipboard.";
-                } catch (e) {
-                    status.textContent = "Copy failed: " + e;
-                }
-            });
-            panel.appendChild(copyBtn);
-
-            container.appendChild(panel);
-        });
+document.addEventListener("DOMContentLoaded", () => {
+    chrome.runtime.sendMessage({ type: "EMAIL_GET" }, (resp) => {
+        emailInput.value = resp?.email || "";
+        setStatus(
+            resp?.email ? "Saved in this browser session." : "Not set yet."
+        );
     });
 });
 
-function toCSV(table) {
-    const rows = [];
-    if (table.headers && table.headers.length) rows.push(table.headers);
-    table.rows.forEach((r) => rows.push(r));
-    return rows
-        .map((cols) =>
-            cols.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")
-        )
-        .join("\n");
-}
+saveBtn.addEventListener("click", () => {
+    const email = emailInput.value.trim();
+    if (!valid(email)) {
+        setStatus("Please enter a valid email.");
+        return;
+    }
+    chrome.runtime.sendMessage({ type: "EMAIL_SET", email }, (resp) => {
+        if (resp?.ok) {
+            setStatus("Saved. You can close this popup.");
+            // notify all tabs so the toolbar status updates
+            chrome.tabs.query({}, (tabs) => {
+                for (const t of tabs) {
+                    chrome.tabs.sendMessage(
+                        t.id,
+                        { type: "EMAIL_UPDATED", email: resp.email },
+                        () => {}
+                    );
+                }
+            });
+        } else {
+            setStatus(resp?.error || "Failed to save.");
+        }
+    });
+});
 
-function downloadBlob(text, filename) {
-    const blob = new Blob([text], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-}
+clearBtn.addEventListener("click", () => {
+    chrome.runtime.sendMessage({ type: "EMAIL_SET", email: "" }, (resp) => {
+        emailInput.value = "";
+        setStatus("Cleared. Set email to capture again.");
+        chrome.tabs.query({}, (tabs) => {
+            for (const t of tabs)
+                chrome.tabs.sendMessage(
+                    t.id,
+                    { type: "EMAIL_UPDATED", email: "" },
+                    () => {}
+                );
+        });
+    });
+});

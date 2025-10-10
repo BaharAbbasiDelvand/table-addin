@@ -1,15 +1,49 @@
-const NEXT_BASE = "http://localhost:3000";             // change for prod
+const NEXT_BASE = "http://localhost:3000"; // change for prod
 const TABLES_ENDPOINT = `${NEXT_BASE}/api/table-reader`;
 const INJECT_ENDPOINT  = `${NEXT_BASE}/api/inject`;
+
+const EMAIL_KEY = "tableBridge_email";
+const sessionStore = chrome.storage?.session || chrome.storage.local;
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 console.log("[BG] boot", { TABLES_ENDPOINT, INJECT_ENDPOINT });
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     try {
+      if (msg?.type === "EMAIL_GET") {
+        const got = await sessionStore.get(EMAIL_KEY);
+        sendResponse({ ok: true, email: got?.[EMAIL_KEY] || "" });
+        return;
+      }
+
+      if (msg?.type === "EMAIL_SET") {
+        const email = String(msg?.email || "").trim();
+        if (!EMAIL_REGEX.test(email)) {
+          sendResponse({ ok: false, error: "Invalid email" });
+          return;
+        }
+        await sessionStore.set({ [EMAIL_KEY]: email });
+        sendResponse({ ok: true, email });
+        return;
+      }
+
       if (msg?.type === "TABLE_CAPTURED") {
         const payload = { ...msg.payload, capturedAt: new Date().toISOString() };
-        console.log("[BG] POST →", TABLES_ENDPOINT, payload);
+
+        // ensure email is present; if missing, pull from storage
+        if (!payload.email) {
+          const got = await sessionStore.get(EMAIL_KEY);
+          const email = got?.[EMAIL_KEY] || "";
+          if (!email) {
+            sendResponse({ ok: false, error: "Email not set" });
+            return;
+          }
+          payload.email = email;
+        }
+
+        console.log("[BG] POST →", TABLES_ENDPOINT, { email: payload.email, url: payload.url });
 
         const res = await fetch(TABLES_ENDPOINT, {
           method: "POST",
@@ -32,7 +66,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (msg?.type === "FETCH_AND_INJECT") {
         console.log("[BG] GET →", INJECT_ENDPOINT);
 
-        // short timeout so UI never hangs
         const ac = new AbortController();
         const to = setTimeout(() => ac.abort("timeout"), 7000);
 
@@ -57,9 +90,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const tabId = sender?.tab?.id;
         if (!tabId) { sendResponse({ ok: false, error: "No sender tab" }); return; }
 
-        // don't await; respond when the send completes
         chrome.tabs.sendMessage(tabId, { type: "INJECT_DATA", payload: data }, () => {
-          // even if no response from content script, complete the request
           sendResponse({ ok: true });
         });
         return;
@@ -67,10 +98,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
       sendResponse({ ok: false, error: "Unknown message" });
     } catch (err) {
-      console.error("[BG] fetch error", err);
+      console.error("[BG] error", err);
       sendResponse({ ok: false, error: String(err) });
     }
   })();
 
-  return true; // keep message channel open for async sendResponse
+  return true;
 });
