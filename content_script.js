@@ -1,5 +1,3 @@
-// content_script.js
-
 let pickMode = false;
 let lastHighlighted = null;
 let savedTables = [];
