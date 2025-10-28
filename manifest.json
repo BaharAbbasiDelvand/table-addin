@@ -9,6 +9,9 @@
     "http://127.0.0.1:3000/*",
     "http://[::1]:3000/*"
   ],
+"icons": {
+  "16": "m4h_logo80.png"
+},
   "background": { "service_worker": "background.js" },
   "content_scripts": [
     {
@@ -20,6 +23,7 @@
     }
   ],
   "action": {
+    "default_icon": "m4h_logo80.png",
     "default_title": "Table Bridge",
     "default_popup": "popup.html"
   }
