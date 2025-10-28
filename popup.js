@@ -2,7 +2,7 @@ const emailInput = document.getElementById("email");
 const saveBtn = document.getElementById("save");
 const clearBtn = document.getElementById("clear");
 const statusEl = document.getElementById("status");
-
+// to update status text in popup below input
 function setStatus(t) {
     statusEl.textContent = t || "";
 }
@@ -10,7 +10,7 @@ function setStatus(t) {
 function valid(email) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
 }
-
+// on popup load, get stored email if any from background.js
 document.addEventListener("DOMContentLoaded", () => {
     chrome.runtime.sendMessage({ type: "EMAIL_GET" }, (resp) => {
         emailInput.value = resp?.email || "";
@@ -19,13 +19,14 @@ document.addEventListener("DOMContentLoaded", () => {
         );
     });
 });
-
+// on save button click, validate and send to background.js to store email
 saveBtn.addEventListener("click", () => {
     const email = emailInput.value.trim();
     if (!valid(email)) {
-        setStatus("Please enter a valid email.");
+        setStatus("Please enter a valid email."); 
         return;
     }
+    // send to background to store
     chrome.runtime.sendMessage({ type: "EMAIL_SET", email }, (resp) => {
         if (resp?.ok) {
             setStatus("Saved. You can close this popup.");
@@ -44,7 +45,7 @@ saveBtn.addEventListener("click", () => {
         }
     });
 });
-
+// on clear button click, remove stored email
 clearBtn.addEventListener("click", () => {
     chrome.runtime.sendMessage({ type: "EMAIL_SET", email: "" }, (resp) => {
         emailInput.value = "";

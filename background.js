@@ -1,18 +1,18 @@
 const NEXT_BASE = "http://localhost:3000"; // change for prod
-const TABLES_ENDPOINT = `${NEXT_BASE}/api/table-reader`;
-const INJECT_ENDPOINT  = `${NEXT_BASE}/api/inject`;
+const TABLES_ENDPOINT = `${NEXT_BASE}/api/table-reader-addin`; // endpoint to receive captured tables
+const INJECT_ENDPOINT  = `${NEXT_BASE}/api/inject`; // endpoint to fetch injection data
 
-const EMAIL_KEY = "tableBridge_email";
-const sessionStore = chrome.storage?.session || chrome.storage.local;
+const EMAIL_KEY = "tableBridge_email"; // storage key for user email
+const sessionStore = chrome.storage?.session || chrome.storage.local; // use session storage if available
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 console.log("[BG] boot", { TABLES_ENDPOINT, INJECT_ENDPOINT });
-
+// listen for messages from content scripts or popup
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     try {
-      if (msg?.type === "EMAIL_GET") {
+      if (msg?.type === "EMAIL_GET") { // get stored email
         const got = await sessionStore.get(EMAIL_KEY);
         sendResponse({ ok: true, email: got?.[EMAIL_KEY] || "" });
         return;
@@ -29,7 +29,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return;
       }
 
-      if (msg?.type === "TABLE_CAPTURED") {
+      if (msg?.type === "TABLE_CAPTURED") { // captured table data
         const payload = { ...msg.payload, capturedAt: new Date().toISOString() };
 
         // ensure email is present; if missing, pull from storage
@@ -44,7 +44,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
 
         console.log("[BG] POST →", TABLES_ENDPOINT, { email: payload.email, url: payload.url });
-
+        //send to backend of Next.js app
         const res = await fetch(TABLES_ENDPOINT, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -62,16 +62,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ ok: true });
         return;
       }
-
+      // fetch injection data request
       if (msg?.type === "FETCH_AND_INJECT") {
         console.log("[BG] GET →", INJECT_ENDPOINT);
-
+        // setup timeout for fetch cause some browsers hang indefinitely
         const ac = new AbortController();
         const to = setTimeout(() => ac.abort("timeout"), 7000);
 
         let data;
         try {
-          const res = await fetch(INJECT_ENDPOINT, { signal: ac.signal, cache: "no-store" });
+          // fetch injection data from backend
+          const res = await fetch(INJECT_ENDPOINT, { signal: ac.signal, cache: "no-store" }); 
           clearTimeout(to);
           console.log("[BG] GET status", res.status);
           if (!res.ok) {
@@ -86,7 +87,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           sendResponse({ ok: false, error: String(e) });
           return;
         }
-
+        
         const tabId = sender?.tab?.id;
         if (!tabId) { sendResponse({ ok: false, error: "No sender tab" }); return; }
 
@@ -95,13 +96,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         });
         return;
       }
-
+      
       sendResponse({ ok: false, error: "Unknown message" });
     } catch (err) {
       console.error("[BG] error", err);
       sendResponse({ ok: false, error: String(err) });
     }
   })();
-
-  return true;
+  
+  return true; //keep the message channel open for async response
 });
