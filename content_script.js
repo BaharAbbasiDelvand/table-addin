@@ -2,12 +2,34 @@ let pickMode = false;
 let lastHighlighted = null;
 let savedTables = [];
 let currentEmail = "";
+//minimize support
+const MIN_KEY = "tableBridge_minimized";
+const minStore = chrome.storage?.session || chrome.storage.local;
+let toolbarMinimized = false;
+
+async function loadMinState() {
+    try {
+        const got = await minStore.get(MIN_KEY);
+        toolbarMinimized = !!got?.[MIN_KEY];
+    } catch {
+        toolbarMinimized = false;
+    }
+}
+async function setMinState(next) {
+    toolbarMinimized = !!next;
+    try {
+        await minStore.set({ [MIN_KEY]: toolbarMinimized });
+    } catch {}
+    renderToolbar();
+}
 
 (async function init() {
+    await loadMinState();
     // get email from background (service worker)
     chrome.runtime.sendMessage({ type: "EMAIL_GET" }, (resp) => {
         currentEmail = resp?.email || "";
         restoreSaved();
+
         renderToolbar();
     });
 })();
@@ -34,21 +56,106 @@ function renderToolbar() {
     bar.style.alignItems = "center";
     bar.style.gap = "8px";
     bar.style.flexWrap = "wrap";
+    // minimize toggle button (simple header control)
+    const minBtn = document.createElement("button");
+    minBtn.id = "tbMinToggle";
+    minBtn.textContent = toolbarMinimized ? "+" : "–";
+    minBtn.title = toolbarMinimized ? "Expand" : "Minimize";
+    Object.assign(minBtn.style, {
+        background: "#374151",
+        border: "0",
+        color: "#fff",
+        padding: "2px 8px",
+        borderRadius: "6px",
+        cursor: "pointer",
+        fontSize: "14px",
+    });
+    minBtn.addEventListener("click", () => setMinState(!toolbarMinimized));
+
+    // title
+
+    const title = document.createElement("span");
+    title.textContent = toolbarMinimized
+        ? `M4H (${savedTables.length || 0})`
+        : " ";
+    title.style.fontSize = "13px";
+    title.style.opacity = ".95";
+    title.style.fontWeight = "600";
+    const headerRow = document.createElement("div");
+    headerRow.style.display = "flex";
+    headerRow.style.alignItems = "center";
+    headerRow.style.gap = "8px";
+    headerRow.appendChild(title);
+    headerRow.appendChild(minBtn);
+
+    bar.appendChild(headerRow);
+    if (toolbarMinimized) {
+        bar.style.padding = "2px 6px";
+        bar.style.gap = "4px";
+        bar.style.flexWrap = "nowrap";
+        title.style.fontSize = "12px";
+        minBtn.style.padding = "0 6px";
+    }
 
     if (!currentEmail) {
-        bar.innerHTML = `
-      <span style="font-size:13px;opacity:.9">Enter email to begin:</span>
-      <input id="tbEmailInput" type="email" placeholder="you@example.com"
-             style="padding:6px 8px;border-radius:6px;border:1px solid #374151;background:#111827;color:#fff;outline:none;min-width:220px"/>
-      <button id="tbEmailSave" style="background:#2563eb;border:0;color:#fff;padding:6px 10px;border-radius:6px;cursor:pointer">Save</button>
-      <span id="tbStatus" class="tg-status" style="font-size:12px;opacity:.9"></span>
-    `;
+        const row = document.createElement("div");
+        row.style.display = toolbarMinimized ? "none" : "flex";
+        row.style.alignItems = "center";
+        row.style.gap = "8px";
+        row.style.flexWrap = "wrap";
+
+        const prompt = document.createElement("span");
+        prompt.style.fontSize = "13px";
+        prompt.style.opacity = ".9";
+        prompt.textContent = "Enter email to begin:";
+
+        const input = document.createElement("input");
+        input.id = "tbEmailInput";
+        input.type = "email";
+        input.placeholder = "you@example.com";
+        Object.assign(input.style, {
+            padding: "6px 8px",
+            borderRadius: "6px",
+            border: "1px solid #374151",
+            background: "#111827",
+            color: "#fff",
+            outline: "none",
+            minWidth: "220px",
+        });
+
+        const save = document.createElement("button");
+        save.id = "tbEmailSave";
+        save.textContent = "Save";
+        Object.assign(save.style, {
+            background: "#2563eb",
+            border: "0",
+            color: "#fff",
+            padding: "6px 10px",
+            borderRadius: "6px",
+            cursor: "pointer",
+        });
+
+        row.appendChild(prompt);
+        row.appendChild(input);
+        row.appendChild(save);
+
+        // status (always visible)
+        const status = document.createElement("span");
+        status.id = "tbStatus";
+        status.className = "tg-status";
+        status.style.fontSize = "12px";
+        status.style.opacity = ".9";
+        status.style.marginLeft = "4px";
+        if (toolbarMinimized) {
+            controls.style.display = "none";
+            status.style.display = "none";
+        }
+        bar.appendChild(row);
+        bar.appendChild(status);
         document.body.appendChild(bar);
+
         // setup email save handlers
-        const input = document.getElementById("tbEmailInput");
-        const save = document.getElementById("tbEmailSave");
         setStatus("Email required.");
-        // try to save email
         function trySave() {
             const email = String(input.value || "").trim();
             if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -58,7 +165,7 @@ function renderToolbar() {
             chrome.runtime.sendMessage({ type: "EMAIL_SET", email }, (resp) => {
                 if (resp?.ok) {
                     currentEmail = resp.email;
-                    renderToolbar(); // re-render now showing the buttons
+                    renderToolbar(); // re-render with buttons
                 } else {
                     setStatus(resp?.error || "Failed to save.");
                 }
@@ -69,19 +176,46 @@ function renderToolbar() {
         input.addEventListener("keydown", (e) => {
             if (e.key === "Enter") trySave();
         });
-        input.focus();
+        // if (toolbarMinimized) {
+        //   row.style.display = "none";
+        //   status.style.display = "none";
+        // }
+        if (!toolbarMinimized) input.focus();
+
         return;
     }
 
-    bar.innerHTML = `
-    <button id="tbPickBtn"   style="background:#2563eb;border:0;color:#fff;padding:6px 10px;border-radius:6px;cursor:pointer">Pick Table → Next.js</button>
-    <button id="tbInjectBtn" style="background:#2563eb;border:0;color:#fff;padding:6px 10px;border-radius:6px;cursor:pointer">Inject from Next.js</button>
-    <button id="tbExportBtn" style="background:#2563eb;border:0;color:#fff;padding:6px 10px;border-radius:6px;cursor:pointer">Download JSON</button>
-    <span id="tbStatus" class="tg-status" style="font-size:12px;opacity:.9"></span>
-    <span id="tbEmailEdit" title="Change email" style="font-size:12px;opacity:.8;text-decoration:underline;cursor:pointer">(${currentEmail})</span>
-  `;
+    // controls wrapper so we can hide/show it when minimized
+    const controls = document.createElement("div");
+    controls.id = "tbControls";
+    controls.style.display = toolbarMinimized ? "none" : "flex";
+    controls.style.alignItems = "center";
+    controls.style.gap = "8px";
+    controls.style.flexWrap = "wrap";
+
+    controls.innerHTML = `
+  <button id="tbPickBtn"   style="background:#2563eb;border:0;color:#fff;padding:6px 10px;border-radius:6px;cursor:pointer">Pick Table → Next.js</button>
+  <button id="tbInjectBtn" style="background:#2563eb;border:0;color:#fff;padding:6px 10px;border-radius:6px;cursor:pointer">Inject from Next.js</button>
+  <button id="tbExportBtn" style="background:#2563eb;border:0;color:#fff;padding:6px 10px;border-radius:6px;cursor:pointer">Download JSON</button>
+  <span id="tbEmailEdit" title="Change email" style="font-size:12px;opacity:.8;text-decoration:underline;cursor:pointer">(${currentEmail})</span>
+`;
+
+    // status (keep visible when expanded; hide if minimized)
+    const status = document.createElement("span");
+    status.id = "tbStatus";
+    status.className = "tg-status";
+    status.style.fontSize = "12px";
+    status.style.opacity = ".9";
+    status.style.marginLeft = "4px";
+
+    if (toolbarMinimized) {
+        status.style.display = "none";
+    }
+
+    bar.appendChild(controls);
+    bar.appendChild(status);
     document.body.appendChild(bar);
-    // setup button handlers
+
     document
         .getElementById("tbPickBtn")
         .addEventListener("click", startPickMode);
@@ -97,6 +231,9 @@ function renderToolbar() {
     });
 
     updateStatusWithCounts();
+
+    // ultra-slim pill when minimized
+    bar.style.padding = toolbarMinimized ? "2px 6px" : "8px 10px";
 }
 function setStatus(msg) {
     const s = document.getElementById("tbStatus");
@@ -281,15 +418,14 @@ function parseTable(table) {
                 if (cleanedText) parts.push({ type: "text", val: cleanedText });
                 imgs.forEach((src) => parts.push({ type: "image", src }));
                 ytLinks.forEach((src) => parts.push({ type: "video", src }));
-                
             }
             // else{
 
             // }
             if (parts.length) {
-              console.log("parts are:", parts);
-              return parts;
-          }
+                console.log("parts are:", parts);
+                return parts;
+            }
             console.log("cleaned text is:", cleanedText);
             return cleanedText;
         });
